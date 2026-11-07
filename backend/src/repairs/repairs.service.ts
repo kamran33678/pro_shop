@@ -107,14 +107,14 @@ export class RepairsService {
     return job;
   }
 
-  async updateStatus(id: string, status: string, notes?: string, userId?: string) {
+  async updateStatus(id: string, status: any, notes?: string, userId?: string) {
     const job = await this.prisma.repairJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('Repair job not found');
 
     const updated = await this.prisma.repairJob.update({
       where: { id },
       data: {
-        status,
+        status: status as any,
         deliveryDate: status === 'DELIVERED' ? new Date() : job.deliveryDate,
       },
     });
@@ -122,7 +122,7 @@ export class RepairsService {
     await this.prisma.repairStatusHistory.create({
       data: {
         repairJobId: id,
-        status,
+        status: status as any,
         notes: notes || `Status changed to ${status}`,
         updatedById: userId || null,
       },

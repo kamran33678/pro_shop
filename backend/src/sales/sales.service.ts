@@ -136,7 +136,7 @@ export class SalesService {
           paidAmount,
           changeAmount,
           balanceAmount,
-          paymentMethod: data.paymentMethod,
+          paymentMethod: data.paymentMethod as any,
           status: 'COMPLETED',
           notes: data.notes || null,
           userId: activeUserId!,
@@ -199,7 +199,7 @@ export class SalesService {
             saleId: sale.id,
             customerId: data.customerId || null,
             amount: paidAmount,
-            paymentMethod: data.paymentMethod,
+            paymentMethod: data.paymentMethod as any,
           },
         });
       }

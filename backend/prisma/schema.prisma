@@ -1,6 +1,7 @@
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -11,6 +12,19 @@ generator client {
 // USER & ROLE MANAGEMENT
 // -------------------------------------------------------------
 
+enum UserRole {
+  OWNER
+  MANAGER
+  SALESPERSON
+  TECHNICIAN
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
 model User {
   id            String        @id @default(uuid())
   name          String
@@ -18,9 +32,9 @@ model User {
   username      String?       @unique
   phone         String?
   passwordHash  String
-  role          String        @default("SALESPERSON") // OWNER, MANAGER, SALESPERSON, TECHNICIAN
-  status        String        @default("ACTIVE")      // ACTIVE, INACTIVE, SUSPENDED
-  permissions   String        @default("[]")          // JSON string array
+  role          UserRole      @default(SALESPERSON)
+  status        AccountStatus @default(ACTIVE)
+  permissions   String[]      @default([]) // Explicit permissions if customized
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -60,8 +74,8 @@ model Product {
   brand            String?
   model            String?
   description      String?
-  purchaseCost     Decimal         @default(0.00)
-  sellingPrice     Decimal         @default(0.00)
+  purchaseCost     Decimal         @default(0.00) @db.Decimal(12, 2)
+  sellingPrice     Decimal         @default(0.00) @db.Decimal(12, 2)
   currentStock     Int             @default(0)
   minStockLevel    Int             @default(5)
   imageUrl         String?
@@ -91,8 +105,8 @@ model ProductVariant {
   ram             String?
   storage         String?
   color           String?
-  additionalCost  Decimal     @default(0.00)
-  additionalPrice Decimal     @default(0.00)
+  additionalCost  Decimal     @default(0.00) @db.Decimal(12, 2)
+  additionalPrice Decimal     @default(0.00) @db.Decimal(12, 2)
   sku             String?     @unique
   barcode         String?     @unique
   createdAt       DateTime    @default(now())
@@ -103,6 +117,14 @@ model ProductVariant {
   @@map("product_variants")
 }
 
+enum DeviceStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  RETURNED
+  IN_REPAIR
+}
+
 model ImeiRecord {
   id              String         @id @default(uuid())
   imei            String         @unique
@@ -111,9 +133,9 @@ model ImeiRecord {
   product         Product        @relation(fields: [productId], references: [id])
   variantId       String?
   variant         ProductVariant? @relation(fields: [variantId], references: [id])
-  status          String         @default("AVAILABLE") // AVAILABLE, RESERVED, SOLD, RETURNED, IN_REPAIR
-  purchaseCost    Decimal        @default(0.00)
-  sellingPrice    Decimal?
+  status          DeviceStatus   @default(AVAILABLE)
+  purchaseCost    Decimal        @default(0.00) @db.Decimal(12, 2)
+  sellingPrice    Decimal?       @db.Decimal(12, 2)
   purchaseDate    DateTime?
   saleDate        DateTime?
   warrantyExpiry  DateTime?
@@ -128,13 +150,23 @@ model ImeiRecord {
   @@map("imei_records")
 }
 
+enum StockMovementType {
+  OPENING_STOCK
+  PURCHASE
+  SALE
+  CUSTOMER_RETURN
+  SUPPLIER_RETURN
+  ADJUSTMENT
+  REPAIR_PART_USAGE
+}
+
 model StockMovement {
   id             String            @id @default(uuid())
   productId      String
   product        Product           @relation(fields: [productId], references: [id])
-  type           String            // OPENING_STOCK, PURCHASE, SALE, CUSTOMER_RETURN, SUPPLIER_RETURN, ADJUSTMENT, REPAIR_PART_USAGE
-  quantity       Int               // positive or negative
-  costPerUnit    Decimal           @default(0.00)
+  type           StockMovementType
+  quantity       Int               // positive (increment) or negative (decrement)
+  costPerUnit    Decimal           @default(0.00) @db.Decimal(12, 2)
   referenceType  String?           // 'PURCHASE', 'SALE', 'REPAIR', 'ADJUSTMENT'
   referenceId    String?
   reason         String?
@@ -158,8 +190,8 @@ model Supplier {
   email           String?
   address         String?
   companyName     String?
-  openingBalance  Decimal           @default(0.00)
-  currentBalance  Decimal           @default(0.00)
+  openingBalance  Decimal           @default(0.00) @db.Decimal(12, 2)
+  currentBalance  Decimal           @default(0.00) @db.Decimal(12, 2) // positive means shop owes supplier
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -169,18 +201,34 @@ model Supplier {
   @@map("suppliers")
 }
 
+enum PurchaseStatus {
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  JAZZCASH
+  EASYPAISA
+  CARD
+  CREDIT
+  PARTIAL
+}
+
 model Purchase {
   id             String            @id @default(uuid())
   invoiceNumber  String            @unique
   supplierId     String
   supplier       Supplier          @relation(fields: [supplierId], references: [id])
-  totalAmount    Decimal
-  discountAmount Decimal           @default(0.00)
-  netAmount      Decimal
-  paidAmount     Decimal           @default(0.00)
-  balanceAmount  Decimal           @default(0.00)
-  paymentMethod  String            @default("CASH") // CASH, BANK_TRANSFER, JAZZCASH, EASYPAISA, CARD, CREDIT, PARTIAL
-  status         String            @default("COMPLETED") // COMPLETED, CANCELLED, RETURNED
+  totalAmount    Decimal           @db.Decimal(12, 2)
+  discountAmount Decimal           @default(0.00) @db.Decimal(12, 2)
+  netAmount      Decimal           @db.Decimal(12, 2)
+  paidAmount     Decimal           @default(0.00) @db.Decimal(12, 2)
+  balanceAmount  Decimal           @default(0.00) @db.Decimal(12, 2)
+  paymentMethod  PaymentMethod     @default(CASH)
+  status         PurchaseStatus    @default(COMPLETED)
   notes          String?
   userId         String
   user           User              @relation(fields: [userId], references: [id])
@@ -201,8 +249,8 @@ model PurchaseItem {
   productId   String
   product     Product   @relation(fields: [productId], references: [id])
   quantity    Int
-  unitCost    Decimal
-  totalCost   Decimal
+  unitCost    Decimal   @db.Decimal(12, 2)
+  totalCost   Decimal   @db.Decimal(12, 2)
   createdAt   DateTime  @default(now())
 
   @@map("purchase_items")
@@ -214,8 +262,8 @@ model PurchasePayment {
   purchase         Purchase?     @relation(fields: [purchaseId], references: [id])
   supplierId       String
   supplier         Supplier      @relation(fields: [supplierId], references: [id])
-  amount           Decimal
-  paymentMethod    String        @default("CASH")
+  amount           Decimal       @db.Decimal(12, 2)
+  paymentMethod    PaymentMethod @default(CASH)
   paymentAccountId String?
   notes            String?
   createdAt        DateTime      @default(now())
@@ -233,10 +281,10 @@ model Customer {
   phone           String        @unique
   email           String?
   address         String?
-  openingBalance  Decimal       @default(0.00)
-  currentBalance  Decimal       @default(0.00)
-  totalPurchases  Decimal       @default(0.00)
-  totalPayments   Decimal       @default(0.00)
+  openingBalance  Decimal       @default(0.00) @db.Decimal(12, 2)
+  currentBalance  Decimal       @default(0.00) @db.Decimal(12, 2) // positive means customer owes shop
+  totalPurchases  Decimal       @default(0.00) @db.Decimal(12, 2)
+  totalPayments   Decimal       @default(0.00) @db.Decimal(12, 2)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -249,19 +297,25 @@ model Customer {
   @@map("customers")
 }
 
+enum SaleStatus {
+  COMPLETED
+  RETURNED
+  CANCELLED
+}
+
 model Sale {
   id             String        @id @default(uuid())
   invoiceNumber  String        @unique
   customerId     String?
   customer       Customer?     @relation(fields: [customerId], references: [id])
-  subtotal       Decimal
-  discountAmount Decimal       @default(0.00)
-  netAmount      Decimal
-  paidAmount     Decimal       @default(0.00)
-  changeAmount   Decimal       @default(0.00)
-  balanceAmount  Decimal       @default(0.00)
-  paymentMethod  String        @default("CASH")
-  status         String        @default("COMPLETED") // COMPLETED, RETURNED, CANCELLED
+  subtotal       Decimal       @db.Decimal(12, 2)
+  discountAmount Decimal       @default(0.00) @db.Decimal(12, 2)
+  netAmount      Decimal       @db.Decimal(12, 2)
+  paidAmount     Decimal       @default(0.00) @db.Decimal(12, 2)
+  changeAmount   Decimal       @default(0.00) @db.Decimal(12, 2)
+  balanceAmount  Decimal       @default(0.00) @db.Decimal(12, 2)
+  paymentMethod  PaymentMethod @default(CASH)
+  status         SaleStatus    @default(COMPLETED)
   notes          String?
   userId         String
   user           User          @relation(fields: [userId], references: [id])
@@ -285,11 +339,11 @@ model SaleItem {
   imeiRecordId  String?
   imeiRecord    ImeiRecord? @relation(fields: [imeiRecordId], references: [id])
   quantity      Int         @default(1)
-  unitPrice     Decimal
-  unitCost      Decimal
-  totalDiscount Decimal     @default(0.00)
-  totalPrice    Decimal
-  grossProfit   Decimal
+  unitPrice     Decimal     @db.Decimal(12, 2)
+  unitCost      Decimal     @db.Decimal(12, 2)
+  totalDiscount Decimal     @default(0.00) @db.Decimal(12, 2)
+  totalPrice    Decimal     @db.Decimal(12, 2)
+  grossProfit   Decimal     @db.Decimal(12, 2)
   createdAt     DateTime    @default(now())
 
   @@map("sale_items")
@@ -301,8 +355,8 @@ model SalePayment {
   sale             Sale?         @relation(fields: [saleId], references: [id])
   customerId       String?
   customer         Customer?     @relation(fields: [customerId], references: [id])
-  amount           Decimal
-  paymentMethod    String        @default("CASH")
+  amount           Decimal       @db.Decimal(12, 2)
+  paymentMethod    PaymentMethod @default(CASH)
   paymentAccountId String?
   transactionRef   String?
   createdAt        DateTime      @default(now())
@@ -315,7 +369,7 @@ model SaleReturn {
   returnNumber       String           @unique
   saleId             String
   sale               Sale             @relation(fields: [saleId], references: [id])
-  totalRefundAmount  Decimal
+  totalRefundAmount  Decimal          @db.Decimal(12, 2)
   reason             String?
   createdAt          DateTime         @default(now())
 
@@ -330,7 +384,7 @@ model SaleReturnItem {
   saleReturn     SaleReturn  @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
   productId      String
   quantity       Int
-  refundAmount   Decimal
+  refundAmount   Decimal     @db.Decimal(12, 2)
   restockStock   Boolean     @default(true)
   createdAt      DateTime    @default(now())
 
@@ -340,6 +394,17 @@ model SaleReturnItem {
 // -------------------------------------------------------------
 // MOBILE REPAIRING MANAGEMENT
 // -------------------------------------------------------------
+
+enum RepairStatus {
+  RECEIVED
+  UNDER_INSPECTION
+  WAITING_FOR_APPROVAL
+  WAITING_FOR_PARTS
+  IN_PROGRESS
+  READY_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
 
 model RepairJob {
   id                   String                 @id @default(uuid())
@@ -353,16 +418,16 @@ model RepairJob {
   deviceCondition      String?
   accessoriesReceived  String?
   diagnosis            String?
-  estimatedCost        Decimal                @default(0.00)
+  estimatedCost        Decimal                @default(0.00) @db.Decimal(12, 2)
   customerApproved     Boolean                @default(false)
   assignedTechnicianId String?
   assignedTechnician   User?                  @relation("TechnicianRepairs", fields: [assignedTechnicianId], references: [id])
-  status               String                 @default("RECEIVED") // RECEIVED, UNDER_INSPECTION, WAITING_FOR_APPROVAL, WAITING_FOR_PARTS, IN_PROGRESS, READY_FOR_DELIVERY, DELIVERED, CANCELLED
-  partsCost            Decimal                @default(0.00)
-  labourCharge         Decimal                @default(0.00)
-  finalAmount          Decimal                @default(0.00)
-  paidAmount           Decimal                @default(0.00)
-  balanceAmount        Decimal                @default(0.00)
+  status               RepairStatus           @default(RECEIVED)
+  partsCost            Decimal                @default(0.00) @db.Decimal(12, 2)
+  labourCharge         Decimal                @default(0.00) @db.Decimal(12, 2)
+  finalAmount          Decimal                @default(0.00) @db.Decimal(12, 2)
+  paidAmount           Decimal                @default(0.00) @db.Decimal(12, 2)
+  balanceAmount        Decimal                @default(0.00) @db.Decimal(12, 2)
   notes                String?
   receivingDate        DateTime               @default(now())
   deliveryDate         DateTime?
@@ -384,10 +449,10 @@ model RepairPart {
   productId   String
   product     Product   @relation(fields: [productId], references: [id])
   quantity    Int       @default(1)
-  unitCost    Decimal
-  unitPrice   Decimal
-  totalCost   Decimal
-  totalPrice  Decimal
+  unitCost    Decimal   @db.Decimal(12, 2)
+  unitPrice   Decimal   @db.Decimal(12, 2)
+  totalCost   Decimal   @db.Decimal(12, 2)
+  totalPrice  Decimal   @db.Decimal(12, 2)
   createdAt   DateTime  @default(now())
 
   @@map("repair_parts")
@@ -397,7 +462,7 @@ model RepairStatusHistory {
   id          String        @id @default(uuid())
   repairJobId String
   repairJob   RepairJob     @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
-  status      String
+  status      RepairStatus
   notes       String?
   updatedById String?
   createdAt   DateTime      @default(now())
@@ -409,13 +474,34 @@ model RepairStatusHistory {
 // DOUBLE-ENTRY ACCOUNTS & EXPENSES
 // -------------------------------------------------------------
 
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum AccountSubType {
+  CASH
+  BANK
+  MOBILE_WALLET
+  RECEIVABLE
+  PAYABLE
+  INVENTORY
+  COGS
+  OPERATING_EXPENSE
+  SALES_REVENUE
+  SERVICE_REVENUE
+}
+
 model Account {
   id             String         @id @default(uuid())
   code           String         @unique
   name           String
-  type           String         // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
-  subType        String         // CASH, BANK, MOBILE_WALLET, RECEIVABLE, PAYABLE, INVENTORY, COGS, OPERATING_EXPENSE, SALES_REVENUE, SERVICE_REVENUE
-  currentBalance Decimal        @default(0.00)
+  type           AccountType
+  subType        AccountSubType
+  currentBalance Decimal        @default(0.00) @db.Decimal(14, 2)
   isSystem       Boolean        @default(false)
   isActive       Boolean        @default(true)
   createdAt      DateTime       @default(now())
@@ -447,8 +533,8 @@ model JournalLine {
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
   accountId      String
   account        Account      @relation(fields: [accountId], references: [id])
-  debit          Decimal      @default(0.00)
-  credit         Decimal      @default(0.00)
+  debit          Decimal      @default(0.00) @db.Decimal(14, 2)
+  credit         Decimal      @default(0.00) @db.Decimal(14, 2)
 
   @@map("journal_lines")
 }
@@ -469,7 +555,7 @@ model Expense {
   title            String
   categoryId       String
   category         ExpenseCategory @relation(fields: [categoryId], references: [id])
-  amount           Decimal
+  amount           Decimal         @db.Decimal(12, 2)
   description      String?
   paymentAccountId String
   paymentAccount   Account         @relation(fields: [paymentAccountId], references: [id])

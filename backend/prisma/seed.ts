@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, AccountType, AccountSubType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -26,21 +26,21 @@ async function main() {
   console.log('✔ Shop settings initialized.');
 
   // 2. Default Chart of Accounts (Double-Entry Engine)
-  const defaultAccounts = [
-    { code: '1010', name: 'Cash in Hand (Counter)', type: 'ASSET', subType: 'CASH', isSystem: true },
-    { code: '1020', name: 'Main Bank Account', type: 'ASSET', subType: 'BANK', isSystem: true },
-    { code: '1030', name: 'JazzCash Merchant Account', type: 'ASSET', subType: 'MOBILE_WALLET', isSystem: true },
-    { code: '1040', name: 'Easypaisa Merchant Account', type: 'ASSET', subType: 'MOBILE_WALLET', isSystem: true },
-    { code: '1050', name: 'Accounts Receivable (Customers Credit)', type: 'ASSET', subType: 'RECEIVABLE', isSystem: true },
-    { code: '1060', name: 'Merchandise Inventory Asset', type: 'ASSET', subType: 'INVENTORY', isSystem: true },
+  const defaultAccounts: { code: string; name: string; type: AccountType; subType: AccountSubType; isSystem: boolean }[] = [
+    { code: '1010', name: 'Cash in Hand (Counter)', type: AccountType.ASSET, subType: AccountSubType.CASH, isSystem: true },
+    { code: '1020', name: 'Main Bank Account', type: AccountType.ASSET, subType: AccountSubType.BANK, isSystem: true },
+    { code: '1030', name: 'JazzCash Merchant Account', type: AccountType.ASSET, subType: AccountSubType.MOBILE_WALLET, isSystem: true },
+    { code: '1040', name: 'Easypaisa Merchant Account', type: AccountType.ASSET, subType: AccountSubType.MOBILE_WALLET, isSystem: true },
+    { code: '1050', name: 'Accounts Receivable (Customers Credit)', type: AccountType.ASSET, subType: AccountSubType.RECEIVABLE, isSystem: true },
+    { code: '1060', name: 'Merchandise Inventory Asset', type: AccountType.ASSET, subType: AccountSubType.INVENTORY, isSystem: true },
     
-    { code: '2010', name: 'Accounts Payable (Suppliers)', type: 'LIABILITY', subType: 'PAYABLE', isSystem: true },
+    { code: '2010', name: 'Accounts Payable (Suppliers)', type: AccountType.LIABILITY, subType: AccountSubType.PAYABLE, isSystem: true },
     
-    { code: '4010', name: 'Product Sales Revenue', type: 'REVENUE', subType: 'SALES_REVENUE', isSystem: true },
-    { code: '4020', name: 'Repair Service Revenue', type: 'REVENUE', subType: 'SERVICE_REVENUE', isSystem: true },
+    { code: '4010', name: 'Product Sales Revenue', type: AccountType.REVENUE, subType: AccountSubType.SALES_REVENUE, isSystem: true },
+    { code: '4020', name: 'Repair Service Revenue', type: AccountType.REVENUE, subType: AccountSubType.SERVICE_REVENUE, isSystem: true },
     
-    { code: '5010', name: 'Cost of Goods Sold (COGS)', type: 'EXPENSE', subType: 'COGS', isSystem: true },
-    { code: '6010', name: 'General Operating Expenses', type: 'EXPENSE', subType: 'OPERATING_EXPENSE', isSystem: true },
+    { code: '5010', name: 'Cost of Goods Sold (COGS)', type: AccountType.EXPENSE, subType: AccountSubType.COGS, isSystem: true },
+    { code: '6010', name: 'General Operating Expenses', type: AccountType.EXPENSE, subType: AccountSubType.OPERATING_EXPENSE, isSystem: true },
   ];
 
   for (const acc of defaultAccounts) {

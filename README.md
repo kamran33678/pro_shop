@@ -69,3 +69,4 @@ The frontend application will be available at: `http://localhost:3000`
 
 ## 📄 License
 UNLICENSED — Proprietary software for PRO SHOP.
+

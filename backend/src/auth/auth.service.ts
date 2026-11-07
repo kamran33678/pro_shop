@@ -53,7 +53,7 @@ export class AuthService {
         passwordHash,
         role: 'OWNER',
         status: 'ACTIVE',
-        permissions: JSON.stringify(['*']),
+        permissions: ['*'],
       },
     });
 

@@ -11,6 +11,22 @@ let cachedServer: Express;
 async function bootstrapServer(): Promise<Express> {
   if (!cachedServer) {
     const expressApp = express();
+
+    // Friendly root endpoint for health & browser checks
+    expressApp.get('/', (req, res) => {
+      res.json({
+        status: 'online',
+        service: 'PRO SHOP Cloud API Server',
+        database: 'Neon PostgreSQL',
+        timestamp: new Date().toISOString(),
+        endpoints: {
+          health: '/api/health',
+          docs: '/api/docs',
+          categories: '/api/products/categories',
+        },
+      });
+    });
+
     const app = await NestFactory.create(
       AppModule,
       new ExpressAdapter(expressApp),

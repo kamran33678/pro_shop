@@ -14,6 +14,21 @@ async function bootstrapServer(): Promise<Express> {
   }
 
   const expressApp = express();
+
+  // Root endpoint for status checks
+  expressApp.get('/', (req, res) => {
+    res.json({
+      status: 'online',
+      service: 'PRO SHOP Cloud API Server',
+      database: 'Neon PostgreSQL',
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        health: '/api/health',
+        docs: '/api/docs',
+      },
+    });
+  });
+
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(expressApp),

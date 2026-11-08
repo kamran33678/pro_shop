@@ -5,12 +5,7 @@
     "api/index.js": {
       "memory": 1024,
       "maxDuration": 30,
-      "includeFiles": [
-        "dist/**",
-        "node_modules/.prisma/**",
-        "node_modules/@prisma/client/**",
-        "prisma/**"
-      ]
+      "includeFiles": "{dist/**,node_modules/.prisma/**,node_modules/@prisma/client/**,prisma/**}"
     }
   },
   "rewrites": [

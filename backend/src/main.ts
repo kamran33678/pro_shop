@@ -3,9 +3,21 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import express, { Express } from 'express';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+let cachedApp: Express;
+
+async function bootstrapServer(): Promise<Express> {
+  if (cachedApp) {
+    return cachedApp;
+  }
+
+  const expressApp = express();
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(expressApp),
+  );
 
   // Global prefix for all API endpoints
   app.setGlobalPrefix('api');
@@ -14,7 +26,7 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Global validation pipe
-  app.useGlobalPipes(
+  app.use(
     new ValidationPipe({
       whitelist: true,
       transform: true,
@@ -60,10 +72,24 @@ async function bootstrap() {
     customSiteTitle: 'PRO SHOP API Documentation',
   });
 
-  const port = process.env.PORT || 5000;
-  await app.listen(port);
-  console.log(`🚀 PRO SHOP Backend is running on: http://localhost:${port}/api`);
-  console.log(`📚 Swagger Documentation is available on: http://localhost:${port}/api/docs`);
+  await app.init();
+  cachedApp = expressApp;
+  return cachedApp;
 }
 
-bootstrap();
+// When running locally in standalone node environment (not in Vercel lambda)
+if (!process.env.VERCEL) {
+  bootstrapServer().then((server) => {
+    const port = process.env.PORT || 5000;
+    server.listen(port, () => {
+      console.log(`🚀 PRO SHOP Backend is running on: http://localhost:${port}/api`);
+      console.log(`📚 Swagger Documentation is available on: http://localhost:${port}/api/docs`);
+    });
+  });
+}
+
+// Serverless handler for Vercel
+export default async function handler(req: any, res: any) {
+  const server = await bootstrapServer();
+  return server(req, res);
+}

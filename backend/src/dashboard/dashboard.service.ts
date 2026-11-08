@@ -455,6 +455,16 @@ export class DashboardService {
       growthPercent,
       dailyTrend,
       sales,
+      summary: {
+        year: currentYear,
+        month: currentMonth + 1,
+        monthName: `${monthNames[currentMonth]} ${currentYear}`,
+        totalSales: monthlyTotal,
+        totalOrders: sales.length,
+        cashSales,
+        creditSales,
+        growthPercent,
+      },
     };
   }
 
@@ -542,6 +552,15 @@ export class DashboardService {
       outOfStockCount,
       products: productValuations,
       recentMovements,
+      summary: {
+        totalPurchaseValuation: totalInventoryValue,
+        totalRetailValuation: totalRetailValue,
+        projectedProfit: totalRetailValue - totalInventoryValue,
+        totalStockUnits: totalStockQty,
+        totalProducts: products.length,
+        lowStockCount,
+        outOfStockCount,
+      },
     };
   }
 
@@ -614,6 +633,10 @@ export class DashboardService {
       customersWithBalanceCount,
       customers: customerList,
       outstandingInvoices,
+      summary: {
+        totalReceivables,
+        debtorsCount: customersWithBalanceCount,
+      },
     };
   }
 
@@ -674,6 +697,10 @@ export class DashboardService {
       suppliersWithBalanceCount,
       suppliers: supplierList,
       pendingPurchases,
+      summary: {
+        totalPayables,
+        creditorsCount: suppliersWithBalanceCount,
+      },
     };
   }
 
@@ -742,6 +769,14 @@ export class DashboardService {
       totalPaid,
       totalBalance,
       tickets: repairJobs,
+      summary: {
+        totalActive: repairJobs.length,
+        byStatus: statusCounts,
+        totalEstimatedCharges: totalEstimated,
+        totalFinalCharges: totalFinal,
+        totalPaid,
+        totalBalanceDue: totalBalance,
+      },
     };
   }
 }

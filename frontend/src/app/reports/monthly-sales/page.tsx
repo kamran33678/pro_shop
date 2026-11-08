@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { api } from '@/lib/api';
+import { api, formatPKR } from '@/lib/api';
 import {
   ArrowLeft,
   Calendar,
@@ -16,55 +16,17 @@ import {
   Clock,
   RefreshCw,
   ShoppingBag,
+  Loader2,
 } from 'lucide-react';
 
-interface MonthlySalesData {
-  summary: {
-    year: number;
-    month: number;
-    monthName: string;
-    totalSales: number;
-    totalOrders: number;
-    cashSales: number;
-    creditSales: number;
-    growthPercent: number;
-  };
-  dailyBreakdown: Array<{
-    day: number;
-    date: string;
-    total: number;
-    count: number;
-  }>;
-  orders: Array<{
-    id: string;
-    invoiceNumber: string;
-    createdAt: string;
-    totalAmount: number;
-    paidAmount: number;
-    paymentMethod: string;
-    paymentStatus: string;
-    customer: {
-      id: string;
-      name: string;
-      phone?: string;
-    } | null;
-    items?: Array<{
-      id: string;
-      quantity: number;
-      unitPrice: number;
-      product: { name: string; sku?: string };
-    }>;
-  }>;
-}
-
 export default function MonthlySalesPage() {
-  const [data, setData] = useState<MonthlySalesData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth()); // 0-indexed for JS Date
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchMonthlySales = async () => {
@@ -85,34 +47,43 @@ export default function MonthlySalesPage() {
     fetchMonthlySales();
   }, [selectedYear, selectedMonth]);
 
-  const filteredOrders = (data?.orders || []).filter((order) => {
+  const sales: any[] = data?.sales || [];
+
+  const filteredOrders = sales.filter((order: any) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
-      order.invoiceNumber.toLowerCase().includes(q) ||
+      (order.invoiceNumber || '').toLowerCase().includes(q) ||
       (order.customer?.name || '').toLowerCase().includes(q) ||
       (order.customer?.phone || '').includes(q)
     );
   });
 
   const months = [
-    { value: 1, label: 'January' },
-    { value: 2, label: 'February' },
-    { value: 3, label: 'March' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'May' },
-    { value: 6, label: 'June' },
-    { value: 7, label: 'July' },
-    { value: 8, label: 'August' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' },
+    { value: 0, label: 'January' },
+    { value: 1, label: 'February' },
+    { value: 2, label: 'March' },
+    { value: 3, label: 'April' },
+    { value: 4, label: 'May' },
+    { value: 5, label: 'June' },
+    { value: 6, label: 'July' },
+    { value: 7, label: 'August' },
+    { value: 8, label: 'September' },
+    { value: 9, label: 'October' },
+    { value: 10, label: 'November' },
+    { value: 11, label: 'December' },
   ];
 
   const years = [selectedYear - 1, selectedYear, selectedYear + 1];
 
-  const maxDaily = Math.max(...(data?.dailyBreakdown.map((d) => d.total) || [1]), 1);
+  const dailyTrend: any[] = data?.dailyTrend || [];
+  const maxDaily = Math.max(...dailyTrend.map((d: any) => Number(d.amount || 0)), 1);
+
+  const monthlyTotal = Number(data?.monthlyTotal ?? 0);
+  const monthlyOrders = Number(data?.monthlyOrders ?? 0);
+  const cashSales = Number(data?.cashSales ?? 0);
+  const creditSales = Number(data?.creditSales ?? 0);
+  const growthPercent = Number(data?.growthPercent ?? 0);
 
   return (
     <AppLayout>
@@ -190,14 +161,14 @@ export default function MonthlySalesPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-              PKR {(data?.summary.totalSales || 0).toLocaleString()}
+              {formatPKR(monthlyTotal)}
             </div>
             <div className="mt-1 flex items-center text-xs text-gray-500 dark:text-gray-400">
               <TrendingUp className="w-3.5 h-3.5 mr-1 text-emerald-500" />
               <span>
                 Growth:{' '}
-                <strong className={data && data.summary.growthPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                  {data?.summary.growthPercent || 0}%
+                <strong className={growthPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                  {growthPercent}%
                 </strong>{' '}
                 vs last month
               </span>
@@ -214,15 +185,12 @@ export default function MonthlySalesPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-              {(data?.summary.totalOrders || 0).toLocaleString()}
+              {monthlyOrders.toLocaleString()}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Average ticket:{' '}
               <strong className="text-gray-700 dark:text-gray-300">
-                PKR{' '}
-                {data?.summary.totalOrders
-                  ? Math.round(data.summary.totalSales / data.summary.totalOrders).toLocaleString()
-                  : 0}
+                {formatPKR(monthlyOrders > 0 ? Math.round(monthlyTotal / monthlyOrders) : 0)}
               </strong>
             </div>
           </div>
@@ -237,13 +205,10 @@ export default function MonthlySalesPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-emerald-600">
-              PKR {(data?.summary.cashSales || 0).toLocaleString()}
+              {formatPKR(cashSales)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {data?.summary.totalSales
-                ? Math.round(((data.summary.cashSales || 0) / data.summary.totalSales) * 100)
-                : 0}
-              % of monthly volume
+              {monthlyTotal > 0 ? Math.round((cashSales / monthlyTotal) * 100) : 0}% of monthly volume
             </div>
           </div>
 
@@ -257,54 +222,52 @@ export default function MonthlySalesPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-amber-600">
-              PKR {(data?.summary.creditSales || 0).toLocaleString()}
+              {formatPKR(creditSales)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {data?.summary.totalSales
-                ? Math.round(((data.summary.creditSales || 0) / data.summary.totalSales) * 100)
-                : 0}
-              % of monthly volume
+              {monthlyTotal > 0 ? Math.round((creditSales / monthlyTotal) * 100) : 0}% of monthly volume
             </div>
           </div>
         </div>
 
         {/* Daily Breakdown Visualizer */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Daily Sales Trend</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Turnover per day in {data?.summary.monthName} {selectedYear}
-              </p>
+        {dailyTrend.length > 0 && (
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Daily Sales Trend</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Turnover per day in {data?.monthName || ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-15 lg:grid-cols-31 gap-1 items-end h-44 pt-6 border-b border-gray-100 dark:border-gray-800">
+              {dailyTrend.map((d: any, idx: number) => {
+                const amount = Number(d.amount || 0);
+                const heightPercent = maxDaily > 0 ? (amount / maxDaily) * 100 : 0;
+                return (
+                  <div key={idx} className="flex flex-col items-center h-full justify-end group relative">
+                    <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center z-10">
+                      <div className="bg-gray-900 text-white text-[11px] rounded px-2 py-1 shadow-lg whitespace-nowrap">
+                        {d.day}: {formatPKR(amount)} ({d.count} orders)
+                      </div>
+                    </div>
+                    <div
+                      className={`w-full rounded-t transition-all ${
+                        amount > 0
+                          ? 'bg-indigo-500 hover:bg-indigo-600 cursor-pointer'
+                          : 'bg-gray-100 dark:bg-gray-800'
+                      }`}
+                      style={{ height: `${Math.max(heightPercent, 4)}%` }}
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1">{d.dayNumber || idx + 1}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
-
-          {/* Simple responsive bar visualization */}
-          <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-15 lg:grid-cols-31 gap-1 items-end h-44 pt-6 border-b border-gray-100 dark:border-gray-800">
-            {(data?.dailyBreakdown || []).map((day) => {
-              const heightPercent = maxDaily > 0 ? (day.total / maxDaily) * 100 : 0;
-              return (
-                <div key={day.day} className="flex flex-col items-center h-full justify-end group relative">
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center z-10">
-                    <div className="bg-gray-900 text-white text-[11px] rounded px-2 py-1 shadow-lg whitespace-nowrap">
-                      Day {day.day}: PKR {day.total.toLocaleString()} ({day.count} orders)
-                    </div>
-                  </div>
-                  <div
-                    className={`w-full rounded-t transition-all ${
-                      day.total > 0
-                        ? 'bg-indigo-500 hover:bg-indigo-600 cursor-pointer'
-                        : 'bg-gray-100 dark:bg-gray-800'
-                    }`}
-                    style={{ height: `${Math.max(heightPercent, 4)}%` }}
-                  />
-                  <span className="text-[10px] text-gray-400 mt-1">{day.day}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        )}
 
         {/* Orders Table */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
@@ -335,7 +298,7 @@ export default function MonthlySalesPage() {
                   <th className="px-6 py-3">Invoice #</th>
                   <th className="px-6 py-3">Date & Time</th>
                   <th className="px-6 py-3">Customer</th>
-                  <th className="px-6 py-3">Payment</th>
+                  <th className="px-6 py-3">Payment Method</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3 text-right">Amount</th>
                 </tr>
@@ -343,8 +306,11 @@ export default function MonthlySalesPage() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                      Loading invoices...
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                        <span>Loading invoices...</span>
+                      </div>
                     </td>
                   </tr>
                 ) : filteredOrders.length === 0 ? (
@@ -355,7 +321,7 @@ export default function MonthlySalesPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => (
+                  filteredOrders.map((order: any) => (
                     <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                       <td className="px-6 py-4 font-mono font-semibold text-indigo-600 dark:text-indigo-400">
                         {order.invoiceNumber}
@@ -363,7 +329,7 @@ export default function MonthlySalesPage() {
                       <td className="px-6 py-4 text-xs">
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-gray-400" />
-                          {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : ''}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -376,7 +342,7 @@ export default function MonthlySalesPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-2.5 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium">
-                          {order.paymentMethod}
+                          {order.paymentMethod || 'CASH'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -387,11 +353,11 @@ export default function MonthlySalesPage() {
                               : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
                           }`}
                         >
-                          {order.paymentStatus}
+                          {order.paymentStatus || 'PAID'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">
-                        PKR {order.totalAmount.toLocaleString()}
+                        {formatPKR(order.netAmount ?? 0)}
                       </td>
                     </tr>
                   ))

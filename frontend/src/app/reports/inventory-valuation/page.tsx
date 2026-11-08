@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { api } from '@/lib/api';
+import { api, formatPKR } from '@/lib/api';
 import {
   ArrowLeft,
   Boxes,
@@ -12,49 +12,15 @@ import {
   XCircle,
   CheckCircle2,
   Search,
-  Filter,
   RefreshCw,
   PackageCheck,
   TrendingUp,
   History,
+  Loader2,
 } from 'lucide-react';
 
-interface InventoryValuationData {
-  summary: {
-    totalPurchaseValuation: number;
-    totalRetailValuation: number;
-    projectedProfit: number;
-    totalStockUnits: number;
-    totalProducts: number;
-    lowStockCount: number;
-    outOfStockCount: number;
-  };
-  products: Array<{
-    id: string;
-    name: string;
-    sku: string;
-    barcode: string;
-    category: { id: string; name: string } | null;
-    stock: number;
-    minStock: number;
-    costPrice: number;
-    salePrice: number;
-    totalCostValue: number;
-    totalRetailValue: number;
-    status: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
-  }>;
-  recentMovements: Array<{
-    id: string;
-    type: string;
-    quantity: number;
-    notes: string;
-    createdAt: string;
-    product: { name: string; sku: string };
-  }>;
-}
-
 export default function InventoryValuationPage() {
-  const [data, setData] = useState<InventoryValuationData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,16 +45,18 @@ export default function InventoryValuationPage() {
     fetchValuation();
   }, []);
 
-  const filteredProducts = (data?.products || []).filter((p) => {
+  const products: any[] = data?.products || [];
+
+  const filteredProducts = products.filter((p: any) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !q ||
-      p.name.toLowerCase().includes(q) ||
-      p.sku.toLowerCase().includes(q) ||
-      (p.barcode && p.barcode.toLowerCase().includes(q));
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.sku || '').toLowerCase().includes(q) ||
+      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+      (p.categoryName && p.categoryName.toLowerCase().includes(q));
 
-    const matchesStatus =
-      statusFilter === 'ALL' || p.status === statusFilter;
+    const matchesStatus = statusFilter === 'ALL' || p.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -126,10 +94,10 @@ export default function InventoryValuationPage() {
               Refresh
             </button>
             <Link
-              href="/inventory"
+              href="/products"
               className="px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
             >
-              Manage Inventory
+              Manage Products
             </Link>
           </div>
         </div>
@@ -152,10 +120,10 @@ export default function InventoryValuationPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-purple-600">
-              PKR {(data?.summary.totalPurchaseValuation || 0).toLocaleString()}
+              {formatPKR(data?.totalInventoryValue ?? 0)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Across <strong>{(data?.summary.totalStockUnits || 0).toLocaleString()}</strong> units in stock
+              Across <strong>{Number(data?.totalStockQty ?? 0).toLocaleString()}</strong> units in stock
             </div>
           </div>
 
@@ -169,7 +137,7 @@ export default function InventoryValuationPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-emerald-600">
-              PKR {(data?.summary.totalRetailValuation || 0).toLocaleString()}
+              {formatPKR(data?.totalRetailValue ?? 0)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Expected gross turnover at retail price
@@ -186,10 +154,10 @@ export default function InventoryValuationPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-blue-600">
-              PKR {(data?.summary.projectedProfit || 0).toLocaleString()}
+              {formatPKR(data?.potentialProfit ?? 0)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Potential profit upon selling stock
+              Potential profit upon selling all stock
             </div>
           </div>
 
@@ -205,14 +173,14 @@ export default function InventoryValuationPage() {
             <div className="mt-3 flex items-center gap-3">
               <div>
                 <span className="text-xl font-bold text-amber-600">
-                  {data?.summary.lowStockCount || 0}
+                  {Number(data?.lowStockCount ?? 0).toLocaleString()}
                 </span>
                 <span className="text-xs text-gray-500 block">Low Stock</span>
               </div>
               <div className="h-8 border-r border-gray-200 dark:border-gray-700" />
               <div>
                 <span className="text-xl font-bold text-red-600">
-                  {data?.summary.outOfStockCount || 0}
+                  {Number(data?.outOfStockCount ?? 0).toLocaleString()}
                 </span>
                 <span className="text-xs text-gray-500 block">Out of Stock</span>
               </div>
@@ -240,7 +208,7 @@ export default function InventoryValuationPage() {
                       : 'text-gray-600 dark:text-gray-400'
                   }`}
                 >
-                  All ({data?.products.length || 0})
+                  All ({products.length})
                 </button>
                 <button
                   onClick={() => setStatusFilter('LOW_STOCK')}
@@ -250,7 +218,7 @@ export default function InventoryValuationPage() {
                       : 'text-gray-600 dark:text-gray-400'
                   }`}
                 >
-                  Low Stock ({data?.summary.lowStockCount || 0})
+                  Low Stock ({Number(data?.lowStockCount ?? 0)})
                 </button>
                 <button
                   onClick={() => setStatusFilter('OUT_OF_STOCK')}
@@ -260,7 +228,7 @@ export default function InventoryValuationPage() {
                       : 'text-gray-600 dark:text-gray-400'
                   }`}
                 >
-                  Out of Stock ({data?.summary.outOfStockCount || 0})
+                  Out of Stock ({Number(data?.outOfStockCount ?? 0)})
                 </button>
               </div>
 
@@ -293,8 +261,11 @@ export default function InventoryValuationPage() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                      Loading inventory records...
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+                        <span>Loading inventory records...</span>
+                      </div>
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
@@ -304,12 +275,12 @@ export default function InventoryValuationPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((p) => (
+                  filteredProducts.map((p: any) => (
                     <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-semibold text-gray-900 dark:text-white">{p.name}</div>
-                        {p.category && (
-                          <span className="text-xs text-gray-400">{p.category.name}</span>
+                        {p.categoryName && (
+                          <span className="text-xs text-gray-400">{p.categoryName}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">
@@ -317,21 +288,21 @@ export default function InventoryValuationPage() {
                         {p.barcode && <div className="text-[11px] text-gray-400">{p.barcode}</div>}
                       </td>
                       <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                        {p.stock}
-                        {p.minStock > 0 && (
+                        {p.currentStock}
+                        {p.minStockLevel > 0 && (
                           <span className="text-xs text-gray-400 font-normal ml-1">
-                            (min: {p.minStock})
+                            (min: {p.minStockLevel})
                           </span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        PKR {p.costPrice.toLocaleString()}
+                        {formatPKR(p.purchaseCost ?? 0)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        PKR {p.salePrice.toLocaleString()}
+                        {formatPKR(p.sellingPrice ?? 0)}
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-purple-600 dark:text-purple-400">
-                        PKR {p.totalCostValue.toLocaleString()}
+                        {formatPKR(p.totalCostValue ?? 0)}
                       </td>
                       <td className="px-6 py-4 text-center">
                         {p.status === 'IN_STOCK' ? (
@@ -364,13 +335,13 @@ export default function InventoryValuationPage() {
               Recent Inventory Adjustments & Movements
             </h3>
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {data.recentMovements.map((m) => (
+              {data.recentMovements.map((m: any) => (
                 <div key={m.id} className="py-2.5 flex items-center justify-between text-xs">
                   <div>
                     <span className="font-semibold text-gray-900 dark:text-white">
-                      {m.product.name}
+                      {m.product?.name}
                     </span>{' '}
-                    <span className="text-gray-400">({m.product.sku})</span>
+                    <span className="text-gray-400">({m.product?.sku})</span>
                     {m.notes && <p className="text-gray-500 mt-0.5">{m.notes}</p>}
                   </div>
                   <div className="text-right">
@@ -382,7 +353,7 @@ export default function InventoryValuationPage() {
                       {m.quantity > 0 ? `+${m.quantity}` : m.quantity} units ({m.type})
                     </span>
                     <span className="text-gray-400 block mt-0.5">
-                      {new Date(m.createdAt).toLocaleDateString()}
+                      {m.createdAt ? new Date(m.createdAt).toLocaleDateString() : ''}
                     </span>
                   </div>
                 </div>

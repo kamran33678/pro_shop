@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { api } from '@/lib/api';
+import { api, formatPKR } from '@/lib/api';
 import {
   ArrowLeft,
   Users,
@@ -15,39 +15,11 @@ import {
   Phone,
   MessageSquare,
   Clock,
-  ArrowUpRight,
+  Loader2,
 } from 'lucide-react';
 
-interface CustomerReceivablesData {
-  summary: {
-    totalReceivables: number;
-    debtorsCount: number;
-  };
-  customers: Array<{
-    id: string;
-    name: string;
-    phone: string;
-    balance: number;
-    totalPurchases: number;
-    unpaidInvoicesCount: number;
-  }>;
-  outstandingInvoices: Array<{
-    id: string;
-    invoiceNumber: string;
-    createdAt: string;
-    totalAmount: number;
-    paidAmount: number;
-    balance: number;
-    customer: {
-      id: string;
-      name: string;
-      phone: string;
-    };
-  }>;
-}
-
 export default function CustomerReceivablesPage() {
-  const [data, setData] = useState<CustomerReceivablesData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,29 +44,32 @@ export default function CustomerReceivablesPage() {
     fetchReceivables();
   }, []);
 
-  const filteredCustomers = (data?.customers || []).filter((c) => {
+  const customers: any[] = data?.customers || [];
+  const outstandingInvoices: any[] = data?.outstandingInvoices || [];
+
+  const filteredCustomers = customers.filter((c: any) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
-      c.name.toLowerCase().includes(q) ||
+      (c.name || '').toLowerCase().includes(q) ||
       (c.phone && c.phone.includes(q))
     );
   });
 
-  const filteredInvoices = (data?.outstandingInvoices || []).filter((inv) => {
+  const filteredInvoices = outstandingInvoices.filter((inv: any) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
-      inv.invoiceNumber.toLowerCase().includes(q) ||
+      (inv.invoiceNumber || '').toLowerCase().includes(q) ||
       (inv.customer?.name || '').toLowerCase().includes(q) ||
       (inv.customer?.phone || '').includes(q)
     );
   });
 
-  const sendWhatsAppReminder = (customer: { name: string; phone: string; balance: number }) => {
-    const cleanPhone = customer.phone.replace(/[^0-9]/g, '');
+  const sendWhatsAppReminder = (customer: { name: string; phone: string; currentBalance: number }) => {
+    const cleanPhone = (customer.phone || '').replace(/[^0-9]/g, '');
     const message = encodeURIComponent(
-      `Assalam-o-Alaikum ${customer.name}, this is a gentle reminder from PRO SHOP regarding your pending balance of PKR ${customer.balance.toLocaleString()}. Please clear it at your earliest convenience. Thank you!`
+      `Assalam-o-Alaikum ${customer.name}, this is a gentle reminder from PRO SHOP regarding your pending balance of ${formatPKR(customer.currentBalance)}. Please clear it at your earliest convenience. Thank you!`
     );
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };
@@ -158,7 +133,7 @@ export default function CustomerReceivablesPage() {
               </div>
             </div>
             <div className="mt-3 text-3xl font-bold text-amber-600">
-              PKR {(data?.summary.totalReceivables || 0).toLocaleString()}
+              {formatPKR(data?.totalReceivables ?? 0)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Total pending recovery from customers
@@ -175,7 +150,7 @@ export default function CustomerReceivablesPage() {
               </div>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900 dark:text-white">
-              {(data?.summary.debtorsCount || 0).toLocaleString()}
+              {Number(data?.customersWithBalanceCount ?? 0).toLocaleString()}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Active debtors with balance &gt; 0
@@ -192,7 +167,7 @@ export default function CustomerReceivablesPage() {
               </div>
             </div>
             <div className="mt-3 text-3xl font-bold text-red-600">
-              {(data?.outstandingInvoices?.length || 0).toLocaleString()}
+              {outstandingInvoices.length.toLocaleString()}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Invoices with partial or pending payments
@@ -254,8 +229,11 @@ export default function CustomerReceivablesPage() {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                        Loading customers...
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+                          <span>Loading customers...</span>
+                        </div>
                       </td>
                     </tr>
                   ) : filteredCustomers.length === 0 ? (
@@ -265,7 +243,7 @@ export default function CustomerReceivablesPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredCustomers.map((cust) => (
+                    filteredCustomers.map((cust: any) => (
                       <tr key={cust.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
                           {cust.name}
@@ -277,19 +255,19 @@ export default function CustomerReceivablesPage() {
                               {cust.phone}
                             </span>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-gray-400">—</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          PKR {cust.totalPurchases.toLocaleString()}
+                          {formatPKR(cust.totalPurchases ?? 0)}
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                            {cust.unpaidInvoicesCount} unpaid
+                            {cust.unpaidInvoices?.length || 0} unpaid
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-amber-600 dark:text-amber-400">
-                          PKR {cust.balance.toLocaleString()}
+                          {formatPKR(cust.currentBalance ?? 0)}
                         </td>
                         <td className="px-6 py-4 text-center">
                           {cust.phone ? (
@@ -301,7 +279,7 @@ export default function CustomerReceivablesPage() {
                               <MessageSquare className="w-3 h-3" /> WhatsApp
                             </button>
                           ) : (
-                            <span className="text-xs text-gray-400">No phone</span>
+                            <span className="text-xs text-gray-400">—</span>
                           )}
                         </td>
                       </tr>
@@ -326,8 +304,11 @@ export default function CustomerReceivablesPage() {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                        Loading outstanding invoices...
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+                          <span>Loading outstanding invoices...</span>
+                        </div>
                       </td>
                     </tr>
                   ) : filteredInvoices.length === 0 ? (
@@ -337,7 +318,7 @@ export default function CustomerReceivablesPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredInvoices.map((inv) => (
+                    filteredInvoices.map((inv: any) => (
                       <tr key={inv.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td className="px-6 py-4 font-mono font-semibold text-amber-600 dark:text-amber-400">
                           {inv.invoiceNumber}
@@ -345,25 +326,25 @@ export default function CustomerReceivablesPage() {
                         <td className="px-6 py-4 text-xs">
                           <div className="flex items-center gap-1.5 text-gray-500">
                             <Clock className="w-3.5 h-3.5" />
-                            {new Date(inv.createdAt).toLocaleDateString()}
+                            {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : ''}
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-semibold text-gray-900 dark:text-white">
-                            {inv.customer?.name}
+                            {inv.customer?.name || 'Walk-in Customer'}
                           </div>
                           {inv.customer?.phone && (
                             <div className="text-xs text-gray-400">{inv.customer.phone}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          PKR {inv.totalAmount.toLocaleString()}
+                          {formatPKR(inv.netAmount ?? 0)}
                         </td>
                         <td className="px-6 py-4 text-right text-emerald-600 font-medium">
-                          PKR {inv.paidAmount.toLocaleString()}
+                          {formatPKR(inv.paidAmount ?? 0)}
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-red-600 dark:text-red-400">
-                          PKR {inv.balance.toLocaleString()}
+                          {formatPKR(inv.balanceAmount ?? 0)}
                         </td>
                       </tr>
                     ))

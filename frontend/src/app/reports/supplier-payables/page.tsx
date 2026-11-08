@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { api } from '@/lib/api';
+import { api, formatPKR } from '@/lib/api';
 import {
   ArrowLeft,
   Truck,
@@ -14,37 +14,11 @@ import {
   Phone,
   Clock,
   Building2,
+  Loader2,
 } from 'lucide-react';
 
-interface SupplierPayablesData {
-  summary: {
-    totalPayables: number;
-    creditorsCount: number;
-  };
-  suppliers: Array<{
-    id: string;
-    name: string;
-    phone: string;
-    balance: number;
-    pendingPurchasesCount: number;
-  }>;
-  pendingPurchases: Array<{
-    id: string;
-    invoiceNumber: string;
-    createdAt: string;
-    totalAmount: number;
-    paidAmount: number;
-    balance: number;
-    supplier: {
-      id: string;
-      name: string;
-      phone: string;
-    };
-  }>;
-}
-
 export default function SupplierPayablesPage() {
-  const [data, setData] = useState<SupplierPayablesData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,21 +43,26 @@ export default function SupplierPayablesPage() {
     fetchPayables();
   }, []);
 
-  const filteredSuppliers = (data?.suppliers || []).filter((s) => {
+  const suppliers: any[] = data?.suppliers || [];
+  const pendingPurchases: any[] = data?.pendingPurchases || [];
+
+  const filteredSuppliers = suppliers.filter((s: any) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
-      s.name.toLowerCase().includes(q) ||
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.companyName || '').toLowerCase().includes(q) ||
       (s.phone && s.phone.includes(q))
     );
   });
 
-  const filteredPurchases = (data?.pendingPurchases || []).filter((p) => {
+  const filteredPurchases = pendingPurchases.filter((p: any) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
-      p.invoiceNumber.toLowerCase().includes(q) ||
+      (p.invoiceNumber || '').toLowerCase().includes(q) ||
       (p.supplier?.name || '').toLowerCase().includes(q) ||
+      (p.supplier?.companyName || '').toLowerCase().includes(q) ||
       (p.supplier?.phone || '').includes(q)
     );
   });
@@ -147,7 +126,7 @@ export default function SupplierPayablesPage() {
               </div>
             </div>
             <div className="mt-3 text-3xl font-bold text-rose-600">
-              PKR {(data?.summary.totalPayables || 0).toLocaleString()}
+              {formatPKR(data?.totalPayables ?? 0)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Total liability due to vendors & distributors
@@ -164,7 +143,7 @@ export default function SupplierPayablesPage() {
               </div>
             </div>
             <div className="mt-3 text-3xl font-bold text-gray-900 dark:text-white">
-              {(data?.summary.creditorsCount || 0).toLocaleString()}
+              {Number(data?.suppliersWithBalanceCount ?? 0).toLocaleString()}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Suppliers with outstanding credit
@@ -181,7 +160,7 @@ export default function SupplierPayablesPage() {
               </div>
             </div>
             <div className="mt-3 text-3xl font-bold text-amber-600">
-              {(data?.pendingPurchases?.length || 0).toLocaleString()}
+              {pendingPurchases.length.toLocaleString()}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Purchases with pending balances
@@ -241,8 +220,11 @@ export default function SupplierPayablesPage() {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                   {loading ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                        Loading suppliers...
+                      <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-rose-600" />
+                          <span>Loading suppliers...</span>
+                        </div>
                       </td>
                     </tr>
                   ) : filteredSuppliers.length === 0 ? (
@@ -252,10 +234,15 @@ export default function SupplierPayablesPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredSuppliers.map((sup) => (
+                    filteredSuppliers.map((sup: any) => (
                       <tr key={sup.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                        <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                          {sup.name}
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-gray-900 dark:text-white">
+                            {sup.name}
+                          </div>
+                          {sup.companyName && sup.companyName !== sup.name && (
+                            <div className="text-xs text-gray-400">{sup.companyName}</div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-xs font-mono">
                           {sup.phone ? (
@@ -264,16 +251,16 @@ export default function SupplierPayablesPage() {
                               {sup.phone}
                             </span>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-gray-400">—</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400">
-                            {sup.pendingPurchasesCount} pending
+                            {sup.unpaidPurchases?.length || 0} pending
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-rose-600 dark:text-rose-400">
-                          PKR {sup.balance.toLocaleString()}
+                          {formatPKR(sup.currentBalance ?? 0)}
                         </td>
                       </tr>
                     ))
@@ -297,8 +284,11 @@ export default function SupplierPayablesPage() {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                        Loading pending purchases...
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-rose-600" />
+                          <span>Loading pending purchases...</span>
+                        </div>
                       </td>
                     </tr>
                   ) : filteredPurchases.length === 0 ? (
@@ -308,7 +298,7 @@ export default function SupplierPayablesPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredPurchases.map((pur) => (
+                    filteredPurchases.map((pur: any) => (
                       <tr key={pur.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td className="px-6 py-4 font-mono font-semibold text-rose-600 dark:text-rose-400">
                           {pur.invoiceNumber}
@@ -316,7 +306,7 @@ export default function SupplierPayablesPage() {
                         <td className="px-6 py-4 text-xs">
                           <div className="flex items-center gap-1.5 text-gray-500">
                             <Clock className="w-3.5 h-3.5" />
-                            {new Date(pur.createdAt).toLocaleDateString()}
+                            {pur.createdAt ? new Date(pur.createdAt).toLocaleDateString() : ''}
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -328,13 +318,13 @@ export default function SupplierPayablesPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          PKR {pur.totalAmount.toLocaleString()}
+                          {formatPKR(pur.netAmount ?? 0)}
                         </td>
                         <td className="px-6 py-4 text-right text-emerald-600 font-medium">
-                          PKR {pur.paidAmount.toLocaleString()}
+                          {formatPKR(pur.paidAmount ?? 0)}
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-rose-600 dark:text-rose-400">
-                          PKR {pur.balance.toLocaleString()}
+                          {formatPKR(pur.balanceAmount ?? 0)}
                         </td>
                       </tr>
                     ))

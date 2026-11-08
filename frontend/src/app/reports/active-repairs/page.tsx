@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { api } from '@/lib/api';
+import { api, formatPKR } from '@/lib/api';
 import {
   ArrowLeft,
   Wrench,
@@ -15,38 +15,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Tag,
+  Loader2,
 } from 'lucide-react';
 
-interface ActiveRepairsData {
-  summary: {
-    totalActive: number;
-    byStatus: Record<string, number>;
-    totalEstimatedCharges: number;
-    totalFinalCharges: number;
-    totalPaid: number;
-    totalBalanceDue: number;
-  };
-  tickets: Array<{
-    id: string;
-    ticketNumber: string;
-    deviceModel: string;
-    imeiSerial: string;
-    problem: string;
-    status: string;
-    estimatedCost: number;
-    finalCost: number;
-    depositPaid: number;
-    createdAt: string;
-    customer: {
-      id: string;
-      name: string;
-      phone: string;
-    };
-  }>;
-}
-
 export default function ActiveRepairsPage() {
-  const [data, setData] = useState<ActiveRepairsData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,13 +44,16 @@ export default function ActiveRepairsPage() {
     fetchRepairs();
   }, []);
 
-  const filteredTickets = (data?.tickets || []).filter((t) => {
+  const tickets: any[] = data?.tickets || [];
+
+  const filteredTickets = tickets.filter((t: any) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !q ||
-      t.ticketNumber.toLowerCase().includes(q) ||
-      t.deviceModel.toLowerCase().includes(q) ||
-      (t.imeiSerial && t.imeiSerial.toLowerCase().includes(q)) ||
+      (t.ticketNumber || '').toLowerCase().includes(q) ||
+      (t.deviceModel || '').toLowerCase().includes(q) ||
+      (t.deviceBrand || '').toLowerCase().includes(q) ||
+      (t.imeiOrSerial || '').toLowerCase().includes(q) ||
       (t.customer?.name || '').toLowerCase().includes(q) ||
       (t.customer?.phone || '').includes(q);
 
@@ -94,6 +70,8 @@ export default function ActiveRepairsPage() {
         return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400';
       case 'WAITING_FOR_PARTS':
         return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
+      case 'WAITING_FOR_APPROVAL':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
       case 'IN_PROGRESS':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
       case 'READY_FOR_DELIVERY':
@@ -171,7 +149,7 @@ export default function ActiveRepairsPage() {
               </div>
             </div>
             <div className="mt-3 text-3xl font-bold text-teal-600">
-              {(data?.summary.totalActive || 0).toLocaleString()}
+              {Number(data?.totalActive ?? 0).toLocaleString()}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Devices currently in service lab
@@ -188,7 +166,7 @@ export default function ActiveRepairsPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-              PKR {(data?.summary.totalEstimatedCharges || 0).toLocaleString()}
+              {formatPKR(data?.totalEstimated ?? 0)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Expected gross billing for open jobs
@@ -205,7 +183,7 @@ export default function ActiveRepairsPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-emerald-600">
-              PKR {(data?.summary.totalPaid || 0).toLocaleString()}
+              {formatPKR(data?.totalPaid ?? 0)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Deposits collected in advance
@@ -222,7 +200,7 @@ export default function ActiveRepairsPage() {
               </div>
             </div>
             <div className="mt-3 text-2xl font-bold text-amber-600">
-              PKR {(data?.summary.totalBalanceDue || 0).toLocaleString()}
+              {formatPKR(data?.totalBalance ?? 0)}
             </div>
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               To be collected upon device handover
@@ -254,8 +232,8 @@ export default function ActiveRepairsPage() {
                     }`}
                   >
                     {opt.label}{' '}
-                    {opt.key !== 'ALL' && data?.summary.byStatus?.[opt.key]
-                      ? `(${data.summary.byStatus[opt.key]})`
+                    {opt.key !== 'ALL' && data?.statusCounts?.[opt.key] !== undefined
+                      ? `(${data.statusCounts[opt.key]})`
                       : ''}
                   </button>
                 ))}
@@ -291,8 +269,11 @@ export default function ActiveRepairsPage() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-                      Loading repair tickets...
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-teal-600" />
+                        <span>Loading repair tickets...</span>
+                      </div>
                     </td>
                   </tr>
                 ) : filteredTickets.length === 0 ? (
@@ -302,37 +283,37 @@ export default function ActiveRepairsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredTickets.map((t) => {
-                    const balance = (t.finalCost > 0 ? t.finalCost : t.estimatedCost) - t.depositPaid;
+                  filteredTickets.map((t: any) => {
+                    const balance = Number(t.balanceAmount ?? 0);
                     return (
                       <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td className="px-6 py-4 font-mono font-semibold text-teal-600 dark:text-teal-400">
                           {t.ticketNumber}
                           <div className="text-[11px] text-gray-400 font-normal">
-                            {new Date(t.createdAt).toLocaleDateString()}
+                            {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
                             <Smartphone className="w-3.5 h-3.5 text-gray-400" />
-                            {t.deviceModel}
+                            {t.deviceBrand} {t.deviceModel}
                           </div>
-                          {t.imeiSerial && (
+                          {t.imeiOrSerial && (
                             <div className="text-xs font-mono text-gray-400">
-                              IMEI: {t.imeiSerial}
+                              IMEI: {t.imeiOrSerial}
                             </div>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-medium text-gray-900 dark:text-white">
-                            {t.customer?.name}
+                            {t.customer?.name || 'Walk-in Customer'}
                           </div>
                           {t.customer?.phone && (
                             <div className="text-xs text-gray-400">{t.customer.phone}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 max-w-xs truncate text-xs text-gray-600 dark:text-gray-300">
-                          {t.problem}
+                          {t.reportedProblem || '—'}
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span
@@ -340,17 +321,17 @@ export default function ActiveRepairsPage() {
                               t.status
                             )}`}
                           >
-                            {t.status.replace(/_/g, ' ')}
+                            {(t.status || '').replace(/_/g, ' ')}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          PKR {t.estimatedCost.toLocaleString()}
+                        <td className="px-6 py-4 text-right font-medium text-gray-900 dark:text-white">
+                          {formatPKR(t.estimatedCost ?? 0)}
                         </td>
                         <td className="px-6 py-4 text-right text-emerald-600 font-medium">
-                          PKR {t.depositPaid.toLocaleString()}
+                          {formatPKR(t.paidAmount ?? 0)}
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-amber-600 dark:text-amber-400">
-                          PKR {Math.max(0, balance).toLocaleString()}
+                          {formatPKR(balance)}
                         </td>
                       </tr>
                     );

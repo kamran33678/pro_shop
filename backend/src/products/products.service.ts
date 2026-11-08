@@ -159,9 +159,12 @@ export class ProductsService {
 
   async lookupBarcode(barcode: string) {
     const code = barcode.trim();
-    // 1. Check Product barcode
+    // 1. Check Product barcode or SKU
     const product = await this.prisma.product.findFirst({
-      where: { barcode: code, isActive: true },
+      where: {
+        isActive: true,
+        OR: [{ barcode: code }, { sku: code }],
+      },
       include: {
         category: true,
         imeiRecords: { where: { status: 'AVAILABLE' } },
@@ -191,6 +194,56 @@ export class ProductsService {
     }
 
     return { found: false, imei: code };
+  }
+
+  async universalLookup(codeStr: string) {
+    const code = codeStr.trim();
+
+    // 1. Check IMEI Record first (e.g. 15 digits)
+    const imeiRecord = await this.prisma.imeiRecord.findUnique({
+      where: { imei: code },
+      include: {
+        product: {
+          include: { category: true },
+        },
+      },
+    });
+
+    if (imeiRecord) {
+      return {
+        found: true,
+        type: 'IMEI',
+        code,
+        imeiRecord,
+        product: imeiRecord.product,
+      };
+    }
+
+    // 2. Check Product Barcode or SKU
+    const product = await this.prisma.product.findFirst({
+      where: {
+        isActive: true,
+        OR: [{ barcode: code }, { sku: code }],
+      },
+      include: {
+        category: true,
+        imeiRecords: { where: { status: 'AVAILABLE' } },
+      },
+    });
+
+    if (product) {
+      return {
+        found: true,
+        type: 'PRODUCT',
+        code,
+        product,
+      };
+    }
+
+    return {
+      found: false,
+      code,
+    };
   }
 
   async quickScanStockIn(

@@ -54,6 +54,12 @@ export class ProductsController {
     return this.productsService.lookupImei(imei);
   }
 
+  @Get('lookup/universal/:code')
+  @ApiOperation({ summary: 'Universal scan lookup by Barcode, IMEI, or SKU' })
+  async universalLookup(@Param('code') code: string) {
+    return this.productsService.universalLookup(code);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get product details by ID' })
   async getProductById(@Param('id') id: string) {

@@ -1,3 +1,5 @@
+require('@prisma/client');
+
 let handler;
 
 module.exports = async (req, res) => {

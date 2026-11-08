@@ -32,3 +32,4 @@ export class UpdateStaffDto {
   @IsOptional()
   password?: string;
 }
+

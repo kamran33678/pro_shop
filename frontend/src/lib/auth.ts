@@ -48,3 +48,4 @@ export const hasPermission = (user: UserSession | null | undefined, permissionKe
   if (user.permissions?.includes('*')) return true;
   return user.permissions?.includes(permissionKey) ?? false;
 };
+

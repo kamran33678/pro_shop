@@ -34,3 +34,4 @@ export class CreateStaffDto {
   @IsOptional()
   permissions?: string[];
 }
+

@@ -230,5 +230,72 @@ export class SalesService {
       maxWait: 10000,
     });
   }
+
+  async quickScanSale(
+    data: {
+      code: string;
+      quantity?: number;
+      paymentMethod?: string;
+      customerId?: string;
+    },
+    userId?: string,
+  ) {
+    const code = data.code.trim();
+    const qty = Math.max(1, data.quantity || 1);
+    const paymentMethod = data.paymentMethod || 'CASH';
+
+    // 1. Check if it's an IMEI
+    let product: any = null;
+    let imeiRecord: any = null;
+
+    const foundImei = await this.prisma.imeiRecord.findUnique({
+      where: { imei: code },
+      include: { product: true },
+    });
+
+    if (foundImei) {
+      if (foundImei.status !== 'AVAILABLE') {
+        throw new BadRequestException(`Device IMEI ${code} is already marked as ${foundImei.status}. Cannot sell.`);
+      }
+      product = foundImei.product;
+      imeiRecord = foundImei;
+    } else {
+      // 2. Lookup by barcode or SKU
+      product = await this.prisma.product.findFirst({
+        where: {
+          isActive: true,
+          OR: [{ barcode: code }, { sku: code }],
+        },
+      });
+    }
+
+    if (!product) {
+      throw new NotFoundException(`No product found with barcode or IMEI: "${code}".`);
+    }
+
+    if (!imeiRecord && product.currentStock < qty) {
+      throw new BadRequestException(`Insufficient stock for "${product.name}". Available stock: ${product.currentStock}`);
+    }
+
+    const unitPrice = Number(product.sellingPrice);
+
+    return this.createSale(
+      {
+        customerId: data.customerId,
+        items: [
+          {
+            productId: product.id,
+            imeiRecordId: imeiRecord?.id,
+            quantity: qty,
+            unitPrice,
+          },
+        ],
+        paidAmount: unitPrice * qty,
+        paymentMethod,
+        notes: `Quick scanner sale (${code})`,
+      },
+      userId,
+    );
+  }
 }
 

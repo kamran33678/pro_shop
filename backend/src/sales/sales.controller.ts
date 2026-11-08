@@ -25,5 +25,11 @@ export class SalesController {
   async createSale(@Body() body: any, @CurrentUser('id') userId?: string) {
     return this.salesService.createSale(body, userId);
   }
+
+  @Post('scan-quick-sale')
+  @ApiOperation({ summary: 'Quick 1-scan checkout by Barcode or IMEI' })
+  async scanQuickSale(@Body() body: any, @CurrentUser('id') userId?: string) {
+    return this.salesService.quickScanSale(body, userId);
+  }
 }
 

@@ -36,6 +36,12 @@ export class ProductsController {
     return this.productsService.createProduct(dto, userId);
   }
 
+  @Post('scan-stock-in')
+  @ApiOperation({ summary: 'Quick 1-scan stock addition by Barcode' })
+  async scanStockIn(@Body() body: any, @CurrentUser('id') userId?: string) {
+    return this.productsService.quickScanStockIn(body, userId);
+  }
+
   @Get('lookup/barcode/:barcode')
   @ApiOperation({ summary: 'Lookup product by barcode value' })
   async lookupBarcode(@Param('barcode') barcode: string) {

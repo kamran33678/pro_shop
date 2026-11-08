@@ -192,5 +192,91 @@ export class ProductsService {
 
     return { found: false, imei: code };
   }
+
+  async quickScanStockIn(
+    data: {
+      code: string;
+      quantity?: number;
+    },
+    userId?: string,
+  ) {
+    const code = data.code.trim();
+    const qty = Math.max(1, data.quantity || 1);
+
+    // 1. Check if barcode matches existing product
+    const product = await this.prisma.product.findFirst({
+      where: {
+        isActive: true,
+        OR: [{ barcode: code }, { sku: code }],
+      },
+      include: { category: true },
+    });
+
+    if (product) {
+      if (product.isTrackedByImei) {
+        return {
+          requiresImei: true,
+          product,
+          message: `Product "${product.name}" is IMEI-tracked. Please enter specific device IMEIs to add to stock.`,
+        };
+      }
+
+      // Increment currentStock
+      const updated = await this.prisma.product.update({
+        where: { id: product.id },
+        data: { currentStock: { increment: qty } },
+        include: { category: true },
+      });
+
+      const activeUserId = userId || (await this.prisma.user.findFirst({ select: { id: true } }))?.id;
+      if (activeUserId) {
+        await this.prisma.stockMovement.create({
+          data: {
+            productId: product.id,
+            type: 'PURCHASE',
+            quantity: qty,
+            costPerUnit: product.purchaseCost,
+            referenceType: 'SCAN_STOCK_IN',
+            reason: `Scanned barcode stock-in (+${qty})`,
+            userId: activeUserId,
+          },
+        });
+      }
+
+      return {
+        success: true,
+        isNew: false,
+        product: updated,
+        addedQuantity: qty,
+        newStock: updated.currentStock,
+        message: `Stock updated! "${updated.name}" +${qty} units added (Now: ${updated.currentStock} in stock)`,
+      };
+    }
+
+    // 2. Check if code is an IMEI
+    const imei = await this.prisma.imeiRecord.findUnique({
+      where: { imei: code },
+      include: { product: true },
+    });
+
+    if (imei) {
+      return {
+        success: true,
+        isNew: false,
+        product: imei.product,
+        imeiRecord: imei,
+        newStock: imei.product.currentStock,
+        message: `Device with IMEI ${code} already in stock (Status: ${imei.status})`,
+      };
+    }
+
+    // 3. Not found: return flag so frontend can offer 1-click Quick Register
+    return {
+      success: false,
+      notFound: true,
+      code,
+      message: `Barcode/IMEI "${code}" not registered yet. Please save product details.`,
+    };
+  }
 }
 

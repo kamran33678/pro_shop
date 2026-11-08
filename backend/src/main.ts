@@ -4,7 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { Express } from 'express';
-const cookieParser = require('cookie-parser');
+import cookieParser = require('cookie-parser');
 
 export async function createApp(expressInstance?: Express) {
   const app = expressInstance
@@ -15,10 +15,7 @@ export async function createApp(expressInstance?: Express) {
   app.setGlobalPrefix('api');
 
   // Middleware
-  const cookieMiddleware = typeof cookieParser === 'function' ? cookieParser : (cookieParser as any).default;
-  if (cookieMiddleware) {
-    app.use(cookieMiddleware());
-  }
+  app.use(cookieParser());
 
   // Global validation pipe
   app.useGlobalPipes(

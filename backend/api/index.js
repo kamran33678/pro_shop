@@ -9,7 +9,19 @@ async function getHandler() {
   }
 
   const server = express();
-  const { createApp } = require('../dist/src/main');
+
+  let mainModule;
+  try {
+    mainModule = require('../dist/src/main');
+  } catch (err) {
+    mainModule = require('../dist/main');
+  }
+
+  const createApp = mainModule.createApp || mainModule.default?.createApp || mainModule;
+  if (typeof createApp !== 'function') {
+    throw new Error('createApp is not a function. Exported keys: ' + Object.keys(mainModule).join(', '));
+  }
+
   const app = await createApp(server);
   await app.init();
 

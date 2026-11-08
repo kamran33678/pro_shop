@@ -3,8 +3,8 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import * as cookieParser from 'cookie-parser';
 import express, { Express } from 'express';
+const cookieParser = require('cookie-parser');
 
 let cachedServer: Express;
 

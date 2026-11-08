@@ -3,45 +3,25 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import express, { Express } from 'express';
+import { Express } from 'express';
 const cookieParser = require('cookie-parser');
 
-let cachedApp: Express;
-
-async function bootstrapServer(): Promise<Express> {
-  if (cachedApp) {
-    return cachedApp;
-  }
-
-  const expressApp = express();
-
-  // Root endpoint for status checks
-  expressApp.get('/', (req, res) => {
-    res.json({
-      status: 'online',
-      service: 'PRO SHOP Cloud API Server',
-      database: 'Neon PostgreSQL',
-      timestamp: new Date().toISOString(),
-      endpoints: {
-        health: '/api/health',
-        docs: '/api/docs',
-      },
-    });
-  });
-
-  const app = await NestFactory.create(
-    AppModule,
-    new ExpressAdapter(expressApp),
-  );
+export async function createApp(expressInstance?: Express) {
+  const app = expressInstance
+    ? await NestFactory.create(AppModule, new ExpressAdapter(expressInstance))
+    : await NestFactory.create(AppModule);
 
   // Global prefix for all API endpoints
   app.setGlobalPrefix('api');
 
   // Middleware
-  app.use(cookieParser());
+  const cookieMiddleware = typeof cookieParser === 'function' ? cookieParser : (cookieParser as any).default;
+  if (cookieMiddleware) {
+    app.use(cookieMiddleware());
+  }
 
   // Global validation pipe
-  app.use(
+  app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
@@ -52,23 +32,9 @@ async function bootstrapServer(): Promise<Express> {
     }),
   );
 
-  // CORS configuration
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const allowedOrigins = frontendUrl.split(',').map((u) => u.trim());
+  // CORS configuration - allow all origins (local, mobile, tunnels, vercel)
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (
-        allowedOrigins.includes(origin) ||
-        origin.endsWith('.vercel.app') ||
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1') ||
-        origin.includes('loca.lt')
-      ) {
-        return callback(null, true);
-      }
-      return callback(null, true);
-    },
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
@@ -87,24 +53,18 @@ async function bootstrapServer(): Promise<Express> {
     customSiteTitle: 'PRO SHOP API Documentation',
   });
 
-  await app.init();
-  cachedApp = expressApp;
-  return cachedApp;
+  return app;
 }
 
-// When running locally in standalone node environment (not in Vercel lambda)
-if (!process.env.VERCEL) {
-  bootstrapServer().then((server) => {
-    const port = process.env.PORT || 5000;
-    server.listen(port, () => {
-      console.log(`🚀 PRO SHOP Backend is running on: http://localhost:${port}/api`);
-      console.log(`📚 Swagger Documentation is available on: http://localhost:${port}/api/docs`);
-    });
-  });
+async function bootstrap() {
+  const app = await createApp();
+  const port = process.env.PORT || 5000;
+  await app.listen(port);
+  console.log(`🚀 PRO SHOP Backend is running on: http://localhost:${port}/api`);
+  console.log(`📚 Swagger Documentation is available on: http://localhost:${port}/api/docs`);
 }
 
-// Serverless handler for Vercel
-export default async function handler(req: any, res: any) {
-  const server = await bootstrapServer();
-  return server(req, res);
+// Only listen directly when not running in serverless environment
+if (!process.env.VERCEL && !process.env.SERVERLESS) {
+  bootstrap();
 }

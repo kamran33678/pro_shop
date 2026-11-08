@@ -53,15 +53,17 @@ export class RepairsService {
     assignedTechnicianId?: string;
   }) {
     // 1. Find or create customer
+    const customerPhone = (data.customerPhone || '03000000000').trim();
+    const customerName = (data.customerName || 'Walk-in Customer').trim();
     let customer = await this.prisma.customer.findUnique({
-      where: { phone: data.customerPhone.trim() },
+      where: { phone: customerPhone },
     });
 
     if (!customer) {
       customer = await this.prisma.customer.create({
         data: {
-          name: data.customerName.trim(),
-          phone: data.customerPhone.trim(),
+          name: customerName,
+          phone: customerPhone,
         },
       });
     }
@@ -72,15 +74,16 @@ export class RepairsService {
 
     const labourCharge = data.labourCharge || 0;
     const finalAmount = labourCharge;
+    const reportedProblem = data.reportedProblem || (data as any).problemDescription || 'General Repair / Service';
 
     const job = await this.prisma.repairJob.create({
       data: {
         ticketNumber,
         customerId: customer.id,
-        deviceBrand: data.deviceBrand,
-        deviceModel: data.deviceModel,
+        deviceBrand: data.deviceBrand || 'General',
+        deviceModel: data.deviceModel || 'Mobile Device',
         imeiOrSerial: data.imeiOrSerial || null,
-        reportedProblem: data.reportedProblem,
+        reportedProblem,
         deviceCondition: data.deviceCondition || null,
         accessoriesReceived: data.accessoriesReceived || null,
         estimatedCost: data.estimatedCost || 0,
@@ -197,6 +200,9 @@ export class RepairsService {
       }
 
       return repairPart;
+    }, {
+      timeout: 20000,
+      maxWait: 10000,
     });
   }
 }

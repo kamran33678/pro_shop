@@ -1,23 +1,35 @@
-require('@prisma/client');
+process.env.SERVERLESS = '1';
+const express = require('express');
 
-let handler;
+let cachedHandler;
+
+async function getHandler() {
+  if (cachedHandler) {
+    return cachedHandler;
+  }
+
+  const server = express();
+  const { createApp } = require('../dist/src/main');
+  const app = await createApp(server);
+  await app.init();
+
+  cachedHandler = server;
+  return cachedHandler;
+}
 
 module.exports = async (req, res) => {
   try {
-    if (!handler) {
-      const main = require('../dist/src/main');
-      handler = main.default || main;
-    }
-    return await handler(req, res);
+    const handler = await getHandler();
+    return handler(req, res);
   } catch (err) {
-    console.error('Serverless execution error:', err);
-    res.setHeader('Content-Type', 'application/json');
+    console.error('Vercel serverless error:', err);
     res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
     res.end(
       JSON.stringify({
-        error: 'Serverless invocation error',
+        error: 'Internal Server Error',
         message: err.message,
-        stack: err.stack,
+        stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
       }),
     );
   }

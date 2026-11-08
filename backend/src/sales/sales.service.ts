@@ -63,7 +63,8 @@ export class SalesService {
       throw new BadRequestException('Shopping cart cannot be empty.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(
+      async (tx) => {
       // 1. Calculate totals and verify items
       let subtotal = 0;
       let totalCost = 0;
@@ -224,6 +225,9 @@ export class SalesService {
           payments: true,
         },
       });
+    }, {
+      timeout: 20000,
+      maxWait: 10000,
     });
   }
 }

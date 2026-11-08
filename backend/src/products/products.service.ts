@@ -151,6 +151,9 @@ export class ProductsService {
       }
 
       return product;
+    }, {
+      timeout: 20000,
+      maxWait: 10000,
     });
   }
 

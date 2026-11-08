@@ -19,8 +19,8 @@ export class RolesGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
     if (!user) return false;
 
-    // OWNER has full system access to all endpoints
-    if (user.role === 'OWNER') {
+    // OWNER and ADMIN have full system access to all endpoints
+    if (user.role === 'OWNER' || user.role === 'ADMIN') {
       return true;
     }
 

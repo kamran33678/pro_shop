@@ -2,17 +2,37 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Menu, ScanBarcode, ShoppingCart, Bell, Wrench } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Menu, ScanBarcode, ShoppingCart, Bell, Wrench, LogOut, Shield, User as UserIcon } from 'lucide-react';
+import { api } from '@/lib/api';
+import { clearAuthSession, isAdmin, UserSession } from '@/lib/auth';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
   shopName?: string;
+  user?: UserSession | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   shopName = 'PRO SHOP',
+  user,
 }) => {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (e) {
+      // Ignore network errors on logout
+    } finally {
+      clearAuthSession();
+      router.replace('/login');
+    }
+  };
+
+  const userIsAdmin = isAdmin(user);
+
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-14 sm:h-16 px-3 sm:px-6 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm w-full">
       {/* Left side: Hamburger Button + Shop Brand */}
@@ -41,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right side: Quick Action Buttons */}
+      {/* Right side: Quick Action Buttons + User Profile */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
         {/* Scanner Shortcut */}
         <Link
@@ -72,15 +92,30 @@ export const Header: React.FC<HeaderProps> = ({
           <span>POS</span>
         </Link>
 
-        {/* Notifications */}
-        <Link
-          href="/notifications"
-          className="relative p-2 text-slate-500 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition"
-          aria-label="Notifications"
-        >
-          <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-        </Link>
+        {/* User Badge & Quick Logout */}
+        {user && (
+          <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-xs font-bold text-slate-900 leading-tight">
+                {user.name}
+              </span>
+              <span className={`text-[10px] font-semibold uppercase flex items-center gap-0.5 ${
+                userIsAdmin ? 'text-blue-600' : 'text-emerald-600'
+              }`}>
+                {userIsAdmin ? <Shield className="w-2.5 h-2.5" /> : <UserIcon className="w-2.5 h-2.5" />}
+                {userIsAdmin ? 'Admin' : 'Staff'}
+              </span>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="p-1.5 sm:p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

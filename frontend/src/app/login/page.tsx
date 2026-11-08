@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Smartphone, Lock, Mail, ArrowRight, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Smartphone, Lock, Mail, ArrowRight, Eye, EyeOff, AlertTriangle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { setAuthSession, getStoredToken } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +18,13 @@ export default function LoginPage() {
   const [isOwnerSetup, setIsOwnerSetup] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // If already logged in, redirect to dashboard
+    const existingToken = getStoredToken();
+    if (existingToken) {
+      router.replace('/');
+      return;
+    }
+
     // Check if system has an owner registered
     async function checkSetup() {
       try {
@@ -31,31 +39,49 @@ export default function LoginPage() {
       }
     }
     checkSetup();
-  }, []);
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const cleanId = identifier.trim();
+    if (!cleanId) {
+      setError('Please enter your email address or username.');
+      return;
+    }
+
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const res = await api.post('/auth/login', {
-        identifier,
+        identifier: cleanId,
+        email: cleanId,
         password,
+        rememberMe,
       });
 
       if (res.data && res.data.accessToken) {
-        localStorage.setItem('pro_shop_token', res.data.accessToken);
-        localStorage.setItem('pro_shop_user', JSON.stringify(res.data.user));
-        router.push('/');
+        setAuthSession(res.data.accessToken, res.data.user);
+        router.replace('/');
+      } else {
+        setError('Login failed: Token not returned.');
       }
     } catch (err: any) {
       if (err.response?.data?.message) {
-        setError(err.response.data.message);
+        const msg = Array.isArray(err.response.data.message)
+          ? err.response.data.message.join(', ')
+          : err.response.data.message;
+        setError(msg);
       } else if (err.code === 'ERR_NETWORK') {
-        setError('Cannot connect to API server. Please verify your connection.');
+        setError('Cannot connect to API server. Please verify the server is running.');
       } else {
-        setError('Invalid credentials or user does not exist.');
+        setError('Invalid credentials. Please verify your email/username and password.');
       }
     } finally {
       setLoading(false);
@@ -63,7 +89,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-teal-400 text-white shadow-xl shadow-blue-500/30">
@@ -108,7 +134,7 @@ export default function LoginPage() {
           <form className="space-y-5" onSubmit={handleLogin}>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-                Email or Username
+                Email Address or Username
               </label>
               <div className="mt-1.5 relative rounded-xl shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -121,6 +147,7 @@ export default function LoginPage() {
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="block w-full pl-10 pr-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   placeholder="owner@proshop.pk or username"
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -130,9 +157,12 @@ export default function LoginPage() {
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
                   Password
                 </label>
-                <span className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-blue-400 hover:text-blue-300 transition"
+                >
                   Forgot password?
-                </span>
+                </Link>
               </div>
               <div className="mt-1.5 relative rounded-xl shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -145,6 +175,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pl-10 pr-12 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -172,7 +203,7 @@ export default function LoginPage() {
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-700 rounded bg-slate-900 cursor-pointer"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-xs text-slate-300 cursor-pointer">
-                  Remember my session
+                  Remember my session (30 days)
                 </label>
               </div>
             </div>
@@ -181,21 +212,38 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-blue-600/30 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-98 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-blue-600/30 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-98 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-50 cursor-pointer"
               >
-                {loading ? 'Authenticating...' : 'Sign In'}
-                <ArrowRight className="w-4 h-4" />
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Authenticating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </div>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-700/60 text-center">
+          <div className="mt-6 pt-6 border-t border-slate-700/60 text-center space-y-2">
             <p className="text-xs text-slate-400">
-              New system installation?{' '}
-              <Link href="/setup" className="font-semibold text-blue-400 hover:text-blue-300">
-                Register Initial Shop Owner
+              Need a staff or shop account?{' '}
+              <Link href="/signup" className="font-semibold text-blue-400 hover:text-blue-300">
+                Create Account
               </Link>
             </p>
+            {isOwnerSetup === false && (
+              <p className="text-xs text-slate-400">
+                New system installation?{' '}
+                <Link href="/setup" className="font-semibold text-amber-400 hover:text-amber-300">
+                  Initial Setup Wizard
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </div>

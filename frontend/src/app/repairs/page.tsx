@@ -310,33 +310,37 @@ export default function RepairsPage() {
 
         {/* Modal: Add New Repair Ticket */}
         {showAddModal && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-100 my-8">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+            <div className="relative bg-white rounded-2xl sm:rounded-3xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] my-auto shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Sticky Modal Header */}
+              <div className="flex items-center justify-between px-5 sm:px-7 py-4 border-b border-slate-100 bg-white flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-teal-50 text-teal-600 rounded-xl">
-                    <Wrench className="w-6 h-6" />
+                    <Wrench className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">New Repair Job Ticket</h3>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900">New Repair Job Ticket</h3>
                     <p className="text-xs text-slate-500">Record customer phone, fault, condition & estimated charges</p>
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                  className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+                  aria-label="Close modal"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {formError && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs">
-                  {formError}
-                </div>
-              )}
-
-              <form onSubmit={handleCreateRepair} className="space-y-4 mt-4">
+              {/* Form with Scrollable Body and Sticky Footer */}
+              <form onSubmit={handleCreateRepair} className="flex flex-col flex-1 overflow-hidden min-h-0">
+                <div className="overflow-y-auto px-5 sm:px-7 py-5 space-y-4 flex-1">
+                  {formError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs">
+                      {formError}
+                    </div>
+                  )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold uppercase text-slate-600 mb-1">
@@ -449,18 +453,21 @@ export default function RepairsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3">
+                </div>
+
+                {/* Sticky Modal Footer with Action Buttons */}
+                <div className="flex items-center justify-end gap-3 px-5 sm:px-7 py-3.5 bg-slate-50 border-t border-slate-100 flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="px-5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="px-4 sm:px-5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-white transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 disabled:opacity-50"
+                    className="px-5 sm:px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-bold shadow-md shadow-teal-500/20 disabled:opacity-50 transition-colors"
                   >
                     {saving ? 'Creating Ticket...' : 'Create Repair Ticket'}
                   </button>

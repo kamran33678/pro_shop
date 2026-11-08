@@ -292,3 +292,4 @@ export default function NetProfitPage() {
     </AppLayout>
   );
 }
+

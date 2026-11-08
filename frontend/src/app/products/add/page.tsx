@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 export default function AddProductRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace('/products');
+    router.replace('/products?add=1');
   }, [router]);
 
   return (

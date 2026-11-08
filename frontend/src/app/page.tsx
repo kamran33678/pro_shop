@@ -107,7 +107,7 @@ export default function DashboardPage() {
               <span>New POS Sale</span>
             </Link>
             <Link
-              href="/products"
+              href="/products?add=1"
               className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm border border-slate-200 rounded-xl shadow-sm transition"
             >
               <Plus className="w-4 h-4 text-slate-500" />
